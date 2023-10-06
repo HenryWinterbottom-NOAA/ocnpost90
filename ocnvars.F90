@@ -21,6 +21,12 @@ module ocnvars
 
 contains
 
+  ! # TODO: This entire module will need to be converted to a
+  ! # namelist; the CDO scripts does not assume any variable names;
+  ! # further the variables to write, and the corresponding
+  ! # interpolation method, is defined in a single `.csv` file and
+  ! # passed to the script; this section is not acceptable as it is
+  ! # hardcoded and assumes a single application.
   subroutine ovars_typedefine
 
     ! local variables
@@ -58,7 +64,9 @@ contains
     ii = ii + 1; ovars(ii)%input_var_name  = 'LwLatSens' ; ovars(ii)%var_remapmethod  = 'conserve'
     ii = ii + 1; ovars(ii)%input_var_name  = 'Heat_PmE'  ; ovars(ii)%var_remapmethod  = 'conserve'
 
-    ! 2D vector states on stagger locations; remapped bilinearly
+    ! # TODO: These are concessions for a single grid type; CDO does
+    ! this in a single command.  2D vector states on stagger
+    ! locations; remapped bilinearly
     ii = ii + 1; ovars(ii)%input_var_name  = 'SSU'
                  ovars(ii)%var_grid = 'Cu'
                  ovars(ii)%var_pair = 'SSV'

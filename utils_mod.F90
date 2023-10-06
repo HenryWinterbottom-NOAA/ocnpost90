@@ -44,6 +44,11 @@ module utils_mod
 
 contains
 
+  ! # TODO: Once again the subroutines in this file contain (1)
+  ! # hardcoded paths, (2) hard-coded variable names, and (3)
+  ! # unnecessary steps since CDO can accomplish this with 1 command
+  ! # for scalars and 2 commands for vectors.
+
   !----------------------------------------------------------
   ! pack 2D fields into arrays by mapping type
   !----------------------------------------------------------
