@@ -7,12 +7,25 @@ program ocnpost
   implicit none
 
   character(len=240) :: filesrc, filedst, wgtsfile, fout
+  ! # TODO: Hardcoded to use pre-computed weights; CDO does not
+  ! # require this and the weights are computed on the fly; further,
+  ! # the ESMF weights do not account for bathymetry, only the
+  ! # geo-coordinate map and there for the sub-surface ocean variables
+  ! # will be incorrect as the bathymetry changes in the vertical.
   character(len=120) :: wgtsdir = '/scratch1/NCEPDEV/climate/climpara/S2S/FIX/fix_UFSp6/fix_reg2grb2/'
-  ! source grid, tripole 1/4 deg, 40 vertical levels
+
+  ! # TODO: Hardcorded to assumed a MOM6 or CICE tripolar grid; also
+  ! hardcoded to assume 40-vertical levels; the CDO method cares
+  ! nothing about the `nxt` and `nyt` nor does it care about the
+  ! number of vertical levels; if this were to be moved to a namelist
+  ! type file it would still require more code than a single command
+  ! provided to CDO.  source grid, tripole 1/4 deg, 40 vertical levels
   integer, parameter :: nxt = 1440, nyt = 1080, nlevs = 40
 
   ! destination grids
   integer, parameter :: ndest = 3
+  ! # TODO: Hardcoded to support only specific grid configurations;
+  ! # CDO is agnostic.
   integer, parameter, dimension(ndest) :: nxrs = (/1440, 720, 360/)
   integer, parameter, dimension(ndest) :: nyrs = (/ 721, 361, 181/)
   character(len=4), dimension(ndest)   :: dstgrds = (/'0p25', '0p5 ', '1p0 '/)
@@ -96,6 +109,14 @@ program ocnpost
   rc = nf90_get_var(ncid, varid, z_i)
   rc = nf90_close(ncid)
   ! rotation angles
+
+  ! # TODO: What happens if the rotation angle variable names are
+  ! # different between input files?; for example, the MOM6/CICE
+  ! # tripolar grids use `angle` as their rotation which results in a
+  ! # different computation for the rotation of the vectors (the CDO
+  ! # script takes care of this) while the forecast output assumes
+  ! # `cos_rot` and `sin_rot` (the CDO script knows how to
+  ! # differentiate and is once again agnostic to the input file.
   call getfield(trim(filesrc), 'cos_rot', dims=(/nxt,nyt/), field=cosrot)
   call getfield(trim(filesrc), 'sin_rot', dims=(/nxt,nyt/), field=sinrot)
 
@@ -108,6 +129,7 @@ program ocnpost
 
   rc = nf90_open(trim(filesrc), nf90_nowrite, ncid)
   ! 3D temp to use as mask, obtain directly from file to preserve vfill
+  ! # TODO: What happens if the variable name changes?
   rc = nf90_inq_varid(ncid, 'temp', varid)
   rc = nf90_get_var(ncid, varid, tmp3d)
   rc = nf90_close(ncid)
@@ -147,6 +169,9 @@ program ocnpost
   ! create types for each packed array
   ! --------------------------------------------------------
 
+  ! # TODO: Only supports two types of remapping; CDO supports all of
+  ! # these and more (e.g., nearest-neighbor) and computes the weights
+  ! # for the respective method on the fly.
   i = 0; j = 0; k = 0
   do n = 1,nvalid
      if (trim(ovars(n)%var_remapmethod)  == 'bilinear') then
@@ -215,6 +240,7 @@ program ocnpost
      allocate(rgmask3d(nxr*nyr,nlevs)); rgmask3d = 0.0
 
      ! lat,lon of destination grid can be obtained from xc_b,yc_b in wgtsfile
+     ! # TODO: What happens if the variable name changes?
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.bilinear.nc'
      rc = nf90_open(trim(wgtsfile), nf90_nowrite, ncid)
      rc = nf90_inq_varid(ncid, 'xc_b', varid)
@@ -225,16 +251,22 @@ program ocnpost
      dstlat = reshape(out1d,(/nxr,nyr/))
      rc = nf90_close(ncid)
 
+     ! # TODO: Hardcoded paths; the path to the ESMF remapping
+     ! # coefficients is not required by CDO.
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.bilinear.nc'
      if (debug) print '(a)','remapping 2D fields bilinear with '//trim(wgtsfile)
      call remap(trim(wgtsfile), dim2=nbilin2d, src_field=bilin2d, dst_field=rgb2d)
      if (debug) call dumpnc('rgbilin2d.'//dstgrid//'.nc', 'rgbilin2d', dims=(/nxr,nyr/), nflds=nbilin2d, field=rgb2d)
 
+     ! # TODO: Hardcoded paths; the path to the ESMF remapping
+     ! # coefficients is not required by CDO.
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.conserve.nc'
      if (debug) print '(a)','remapping 2D fields conserv with '//trim(wgtsfile)
      call remap(trim(wgtsfile), dim2=nconsd2d, src_field=consd2d, dst_field=rgc2d)
      if (debug) call dumpnc('rgconsd2d.'//dstgrid//'.nc', 'rgconsd2d', dims=(/nxr,nyr/), nflds=nconsd2d, field=rgc2d)
 
+     ! # TODO: Hardcoded paths; the path to the ESMF remapping
+     ! # coefficients is not required by CDO.
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.bilinear.nc'
      if (debug) print '(a)','remapping 3D fields bilinear with '//trim(wgtsfile)
      call remap(trim(wgtsfile), nk=nlevs, nflds=nbilin3d, src_field=bilin3d, dst_field=rgb3d)
@@ -244,6 +276,8 @@ program ocnpost
      ! remap the source grid 3D mask to obtain the interpolation mask.
      ! --------------------------------------------------------
 
+     ! # TODO: Hardcoded paths; the path to the ESMF remapping
+     ! # coefficients is not required by CDO.
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.bilinear.nc'
      call remap(trim(wgtsfile), dim2=nlevs, src_field=mask3d, dst_field=rgmask3d)
      ! set interpolation mask missing on land, 1.0 on ocean on destination grids
@@ -271,6 +305,7 @@ program ocnpost
      ! from remapped ssu,ssv
      ! --------------------------------------------------------
 
+     ! # TODO: What happens if the variable names change?
      do n = 1,nbilin2d
         if (trim(b2d(n)%output_var_name) == 'speed')idx1 = n
         if (trim(b2d(n)%output_var_name) ==   'SSU')idx2 = n
@@ -279,12 +314,15 @@ program ocnpost
      where(rgb2d(:,idx1) .ne. vfill)rgb2d(:,idx1) = &
           sqrt(rgb2d(:,idx2)**2 + rgb2d(:,idx3)**2)
 
-     ! --------------------------------------------------------
-     ! write the mapped fields
+     ! # TODO: This entire next block of FORTRAN code is done via a
+     ! single CDO command.
+     ! -------------------------------------------------------- write
+     ! the mapped fields
      ! --------------------------------------------------------
 
      fout = 'test.'//dstgrid//'.nc'
 
+     ! # TODO: What happens if the variable names change?
      rc = nf90_create(trim(fout), nf90_clobber, ncid)
      rc = nf90_def_dim(ncid, 'longitude', nxr, idimid)
      rc = nf90_def_dim(ncid, 'latitude',  nyr, jdimid)
