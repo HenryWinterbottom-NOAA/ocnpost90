@@ -39,7 +39,8 @@ module utils_mod
   public remap
   public dumpnc
 
-  logical :: debug = .true.
+  !logical :: debug = .true.
+  logical :: debug = .false.
 
 contains
 
@@ -473,8 +474,6 @@ contains
     character(len=20) :: subname = 'dumpnc2d'
 
     if (debug)print '(a)','enter '//trim(subname)//' variable '//vname
-    print *,dims
-    print *,size(field,1),size(field,2),nflds
     allocate(a3d(dims(1),dims(2),nflds)); a3d = 0.0
 
     rc = nf90_create(trim(fname), nf90_clobber, ncid)
@@ -507,8 +506,6 @@ contains
     character(len=20) :: subname = 'dumpnc3d'
 
     if (debug)print '(a)','enter '//trim(subname)//' variable '//vname
-    print *,dims
-    print *,size(field,1),size(field,2),size(field,3)
     allocate(a4d(dims(1),dims(2),dims(3),nflds)); a4d = 0.0
 
     rc = nf90_create(trim(fname), nf90_clobber, ncid)
@@ -543,8 +540,6 @@ contains
     character(len=20) :: subname = 'dumpnc3dk'
 
     if (debug)print '(a)','enter '//trim(subname)//' variable '//vname
-    print *,dims
-    print *,size(field,1),size(field,2)
     allocate(a3d(dims(1),dims(2),dims(3))); a3d = 0.0
 
     rc = nf90_create(trim(fname), nf90_clobber, ncid)

@@ -7,7 +7,6 @@ program ocnpost
   implicit none
 
   character(len=240) :: filesrc, filedst, wgtsfile, fout
-  !character(len=120) :: wgtsdir = '/scratch1/NCEPDEV/climate/Denise.Worthen/grids-test-202210/'
   character(len=120) :: wgtsdir = '/scratch1/NCEPDEV/climate/climpara/S2S/FIX/fix_UFSp6/fix_reg2grb2/'
   ! source grid, tripole 1/4 deg, 40 vertical levels
   integer, parameter :: nxt = 1440, nyt = 1080, nlevs = 40
@@ -53,9 +52,10 @@ program ocnpost
   integer :: nd, nxr, nyr
   integer :: i,j,k,n,nn,nvalid
   integer :: rc,ncid,varid,dimid
-  integer :: nbilin2d, nbilin3d, nconsd2d
+  integer :: nbilin2d,nbilin3d,nconsd2d
   real    :: vfill
-  integer :: idimid, jdimid, kdimid, edimid, timid
+  integer :: idimid,jdimid,kdimid,edimid,timid
+  integer :: idx1,idx2,idx3
 
   logical :: debug = .true.
 
@@ -98,9 +98,6 @@ program ocnpost
   ! rotation angles
   call getfield(trim(filesrc), 'cos_rot', dims=(/nxt,nyt/), field=cosrot)
   call getfield(trim(filesrc), 'sin_rot', dims=(/nxt,nyt/), field=sinrot)
-  !print *,z_l
-  !print *,z_i
-  !print *,timestamp
 
   ! --------------------------------------------------------
   ! mask3d contain 1's on land and 0's at valid points.
@@ -110,7 +107,7 @@ program ocnpost
   ! --------------------------------------------------------
 
   rc = nf90_open(trim(filesrc), nf90_nowrite, ncid)
-  ! 3D temp to use as mask
+  ! 3D temp to use as mask, obtain directly from file to preserve vfill
   rc = nf90_inq_varid(ncid, 'temp', varid)
   rc = nf90_get_var(ncid, varid, tmp3d)
   rc = nf90_close(ncid)
@@ -203,8 +200,7 @@ program ocnpost
   ! remap packed arrays to each destination grid
   ! --------------------------------------------------------
 
-  nd = 1
-  !do nd = 1,ndest
+  do nd = 1,ndest
      dstgrid =  trim(dstgrds(nd))
      nxr = nxrs(nd); nyr = nyrs(nd)
 
@@ -214,17 +210,17 @@ program ocnpost
      allocate(dstlon(nxr,nyr)); dstlon = 0.0
      allocate(dstlat(nxr,nyr)); dstlat = 0.0
      allocate(out1d(nxr*nyr)); out1d = 0.0
+     allocate(out2d(nxr,nyr)); out2d = 0.0
+     allocate(out3d(nxr,nyr,nlevs)); out3d = 0.0
      allocate(rgmask3d(nxr*nyr,nlevs)); rgmask3d = 0.0
 
      ! lat,lon of destination grid can be obtained from xc_b,yc_b in wgtsfile
      wgtsfile = trim(wgtsdir)//'tripole.mx025.Ct.to.rect.'//trim(dstgrid)//'.bilinear.nc'
      rc = nf90_open(trim(wgtsfile), nf90_nowrite, ncid)
      rc = nf90_inq_varid(ncid, 'xc_b', varid)
-     print *,trim(nf90_strerror(rc))
      rc = nf90_get_var(ncid,    varid, out1d)
      dstlon = reshape(out1d,(/nxr,nyr/))
      rc = nf90_inq_varid(ncid, 'yc_b', varid)
-     print *,trim(nf90_strerror(rc))
      rc = nf90_get_var(ncid,    varid, out1d)
      dstlat = reshape(out1d,(/nxr,nyr/))
      rc = nf90_close(ncid)
@@ -271,11 +267,21 @@ program ocnpost
      end do
 
      ! --------------------------------------------------------
-     ! write the mapped fields
+     ! replace model native speed field with a value calculated
+     ! from remapped ssu,ssv
      ! --------------------------------------------------------
 
-     allocate(out2d(nxr,nyr)); out2d = 0.0
-     allocate(out3d(nxr,nyr,nlevs)); out3d = 0.0
+     do n = 1,nbilin2d
+        if (trim(b2d(n)%output_var_name) == 'speed')idx1 = n
+        if (trim(b2d(n)%output_var_name) ==   'SSU')idx2 = n
+        if (trim(b2d(n)%output_var_name) ==   'SSV')idx3 = n
+     enddo
+     where(rgb2d(:,idx1) .ne. vfill)rgb2d(:,idx1) = &
+          sqrt(rgb2d(:,idx2)**2 + rgb2d(:,idx3)**2)
+
+     ! --------------------------------------------------------
+     ! write the mapped fields
+     ! --------------------------------------------------------
 
      fout = 'test.'//dstgrid//'.nc'
 
@@ -369,8 +375,8 @@ program ocnpost
      rc = nf90_close(ncid)
 
      deallocate(rgb2d, rgc2d, rgb3d)
-     deallocate(out1d, dstlon, dstlat, rgmask3d)
-  !end do !nd
+     deallocate(out1d, out2d, out3d, dstlon, dstlat, rgmask3d)
+  end do !nd
   print *,'all done!'
 
 end program ocnpost
